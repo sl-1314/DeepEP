@@ -1245,6 +1245,7 @@ combine_overlappable(void* combined_x,
         if (decode_warp_idx == num_decode_warps and lane_id < kNumStages) {
             mbarrier_init(full_barriers[lane_id], 1);
             mbarrier_init(empty_barriers[lane_id], num_decode_warps);
+            fence_barrier_init();
         }
         asm volatile("bar.sync %0, %1;" :: "r"(group_idx + 1), "r"((num_decode_warps + 1) * 32));
 
@@ -1316,6 +1317,8 @@ combine_overlappable(void* combined_x,
                         );
                     }
 
+                    __syncwarp();
+                    fence_view_async_shared();
                     if (elect_one_sync())
                         mbarrier_arrive(empty_barriers[stage_idx]);
                     stage_idx = (stage_idx + 1) % kNumStages;
@@ -1726,6 +1729,7 @@ LOW_LATENCY_COMBINE_RECV:
         if (decode_warp_idx == num_decode_warps and lane_id < kNumStages) {
             mbarrier_init(full_barriers[lane_id], 1);
             mbarrier_init(empty_barriers[lane_id], num_decode_warps);
+            fence_barrier_init();
         }
         asm volatile("bar.sync %0, %1;" ::"r"(group_idx + 1), "r"((num_decode_warps + 1) * 32));
 
@@ -1814,6 +1818,7 @@ LOW_LATENCY_COMBINE_RECV:
                             false,
                             topk_weight);
                     }
+                    __syncwarp();
                     fence_view_async_shared();
                     if (elect_one_sync())
                         mbarrier_arrive(empty_barriers[stage_idx]);
@@ -1835,6 +1840,9 @@ LOW_LATENCY_COMBINE_RECV:
                 __syncwarp();
             }
         }
+
+        // Flush all stores
+        tma_store_wait<0>();
     }
 }
 
