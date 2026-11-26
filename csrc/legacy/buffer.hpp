@@ -14,7 +14,21 @@
 #include "../utils/event.hpp"
 #include "../utils/shared_memory.hpp"
 #include "../kernels/legacy/api.cuh"
+#ifdef EP_DISABLE_ELASTIC
+namespace deep_ep::nvshmem {
+std::vector<uint8_t> get_unique_id();
+int init(const std::vector<uint8_t>& root_unique_id_val,
+         const int& rank,
+         const int& num_ranks,
+         const int& team_split_stride);
+void* alloc(const size_t& size, const size_t& alignment);
+void free(void* ptr);
+void barrier(const bool& with_cpu_sync, const std::optional<cudaStream_t>& stream_opt = std::nullopt);
+void finalize();
+}  // namespace deep_ep::nvshmem
+#else
 #include "../kernels/backend/api.cuh"
+#endif
 #include "config.hpp"
 
 namespace deep_ep::legacy {

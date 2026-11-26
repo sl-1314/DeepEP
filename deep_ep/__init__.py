@@ -79,17 +79,21 @@ def init_jit():
                 find_cuda_home(),   # CUDA home
                 find_nccl_root())   # NCCL root
 
-# Run initialization
-check_nccl_so()
-init_jit()
+# Run initialization if elastic/JIT APIs are built
+import deep_ep._C as _C
+if hasattr(_C, 'init_jit'):
+    check_nccl_so()
+    init_jit()
 
 
 # Import APIs after initialization
 from .buffers.legacy import Buffer
-from .buffers.elastic import ElasticBuffer, EPHandle
+if hasattr(_C, 'ElasticBuffer'):
+    from .buffers.elastic import ElasticBuffer, EPHandle
 # noinspection PyUnresolvedReferences
 from .utils.event import EventOverlap, EventHandle
-from .utils.envs import get_physical_domain_size, get_logical_domain_size
+if hasattr(_C, 'get_physical_domain_size'):
+    from .utils.envs import get_physical_domain_size, get_logical_domain_size
 
 # noinspection PyUnresolvedReferences
 from deep_ep._C import Config, topk_idx_t

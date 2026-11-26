@@ -3,9 +3,11 @@
 
 #include <deep_ep/common/compiled.cuh>
 
+#include "legacy/buffer.hpp"
+#ifndef EP_DISABLE_ELASTIC
 #include "jit/api.hpp"
 #include "elastic/buffer.hpp"
-#include "legacy/buffer.hpp"
+#endif
 
 #ifndef TORCH_EXTENSION_NAME
 #define TORCH_EXTENSION_NAME _C
@@ -28,12 +30,16 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     // The integer type of top-k indices
     m.attr("topk_idx_t") = py::cast(c10::CppTypeToScalarType<deep_ep::topk_idx_t>::value);
 
+#ifndef EP_DISABLE_ELASTIC
     // JIT API
     deep_ep::jit::register_apis(m);
+#endif
 
     // Register legacy buffer APIs
     deep_ep::legacy::register_apis(m);
 
+#ifndef EP_DISABLE_ELASTIC
     // Register elastic buffer (DeepEP V2) APIs
     deep_ep::elastic::register_apis(m);
+#endif
 }

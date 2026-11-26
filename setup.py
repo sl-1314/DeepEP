@@ -101,6 +101,9 @@ if __name__ == '__main__':
     include_dirs = [f'{current_dir}/deep_ep/include',
                     f'{current_dir}/third-party/fmt/include',
                     '/usr/local/cuda/include/cccl']
+    sys_prefix_inc = Path(os.sys.prefix) / 'include'
+    if (sys_prefix_inc / 'infiniband' / 'mlx5dv.h').exists():
+        include_dirs.append(str(sys_prefix_inc))
     library_dirs = []
     nvcc_dlink = []
     extra_link_args = ['-lcuda']
@@ -118,13 +121,29 @@ if __name__ == '__main__':
 
     # NCCL flags. Same story as NVSHMEM above — pip wheels ship
     # ``libnccl.so.2`` only, so resolve the real name dynamically.
-    sources.extend(['csrc/kernels/backend/nccl.cu'])
-    include_dirs.extend([f'{nccl_root_dir}/include'])
-    nccl_lib = get_nccl_lib_name(nccl_root_dir)
-    extra_link_args.extend([f'-l:{nccl_lib}', f'-Wl,-rpath,{nccl_root_dir}/lib'])
+    # ElasticBuffer (DeepEP V2) requires NCCL >= 2.30.4 (`ncclGinRequest_t`).
+    disable_elastic = int(os.getenv('EP_DISABLE_ELASTIC', '0'))
+    if not disable_elastic:
+        nccl_h = Path(nccl_root_dir) / 'include' / 'nccl.h'
+        if nccl_h.exists():
+            nccl_h_txt = nccl_h.read_text()
+            maj = re.search(r'#define\s+NCCL_MAJOR\s+(\d+)', nccl_h_txt)
+            min_ = re.search(r'#define\s+NCCL_MINOR\s+(\d+)', nccl_h_txt)
+            pat = re.search(r'#define\s+NCCL_PATCH\s+(\d+)', nccl_h_txt)
+            if maj and min_ and pat:
+                ver = (int(maj.group(1)), int(min_.group(1)), int(pat.group(1)))
+                if ver < (2, 30, 4):
+                    print(f' > NCCL {ver[0]}.{ver[1]}.{ver[2]} < 2.30.4 detected: disabling DeepEP V2 (ElasticBuffer) and building legacy NVSHMEM-only')
+                    disable_elastic = 1
 
-    # CUDA driver sources
-    sources.extend(['csrc/kernels/backend/cuda_driver.cu'])
+    if disable_elastic:
+        cxx_flags.append('-DEP_DISABLE_ELASTIC')
+        nvcc_flags.append('-DEP_DISABLE_ELASTIC')
+    else:
+        sources.extend(['csrc/kernels/backend/nccl.cu', 'csrc/kernels/backend/cuda_driver.cu'])
+        include_dirs.extend([f'{nccl_root_dir}/include'])
+        nccl_lib = get_nccl_lib_name(nccl_root_dir)
+        extra_link_args.extend([f'-l:{nccl_lib}', f'-Wl,-rpath,{nccl_root_dir}/lib'])
 
     # TODO: remove these
     if int(os.getenv('DISABLE_SM90_FEATURES', 0)):
