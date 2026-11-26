@@ -1,4 +1,5 @@
 #include <pybind11/pybind11.h>
+#include <pybind11/functional.h>
 #include <torch/python.h>
 
 #include <deep_ep/common/compiled.cuh>
